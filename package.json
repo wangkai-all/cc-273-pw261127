@@ -1,0 +1,22 @@
+{
+  "name": "rekey-workbench",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local rekey workbench for partially encrypted analytics tables (AES-256-GCM, in-place chunked rotation)",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node src/cli.js serve",
+    "demo": "node src/cli.js init && node src/cli.js serve --port 4173",
+    "init": "node src/cli.js init",
+    "rekey": "node src/cli.js rekey",
+    "status": "node src/cli.js status",
+    "verify": "node src/cli.js verify",
+    "test": "node --test",
+    "test:unit": "node --test test/crypto.test.js test/rotation.test.js",
+    "test:server": "node --test test/server.test.js",
+    "test:crash": "node --test test/crash.test.js"
+  }
+}

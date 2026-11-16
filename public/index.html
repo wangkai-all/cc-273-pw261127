@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>换钥工作台 · 本地演示</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <div>
+        <h1>换钥工作台</h1>
+        <p class="sub">本地测试钥 · 虚构数据 · AES-256-GCM</p>
+      </div>
+    </div>
+    <div class="top-meta">
+      <span id="inst" class="mono dim">—</span>
+      <button id="refresh" class="btn ghost" type="button">刷新</button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <main class="layout">
+    <section class="rail">
+      <div class="card" id="overview">
+        <h2>总览</h2>
+        <div class="stat-grid" id="statGrid"></div>
+        <div class="rule"></div>
+        <h3>各用途</h3>
+        <div id="purposeList" class="purpose-list"></div>
+      </div>
+
+      <div class="card">
+        <h2>密钥清单</h2>
+        <p class="hint">同一用途同一时刻只有一把活动钥；旧钥退休后仍可解密，直到所有退出条件成立。</p>
+        <div id="keyList" class="key-list"></div>
+      </div>
+    </section>
+
+    <section class="main">
+      <div class="card">
+        <div class="card-head">
+          <h2>轮换</h2>
+          <div class="seg" role="group" aria-label="轮换策略">
+            <button type="button" class="seg-btn is-on" data-strategy="in_place_chunked">原地逐块</button>
+            <button type="button" class="seg-btn" data-strategy="shadow_copy" id="shadowBtn">影子副本</button>
+          </div>
+        </div>
+        <p id="strategyNote" class="note"></p>
+        <div class="form-row">
+          <label>用途
+            <select id="rotPurpose">
+              <option value="pii">pii · customer_email</option>
+              <option value="analytics">analytics · session_label</option>
+              <option value="audit">audit · audit_ref</option>
+            </select>
+          </label>
+          <label>每块行数
+            <input id="rotChunk" type="number" min="1" max="500" value="20" />
+          </label>
+          <button id="startRot" class="btn primary" type="button">开始 / 继续轮换</button>
+        </div>
+        <div class="rule"></div>
+        <div id="runPanel"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h2>读取一格</h2>
+          <p class="hint">读取会先取短期租约；命中内存缓存则不取租约，但仍校验撤销与钥状态。</p>
+          <div class="form-row tight">
+            <label>行 id <input id="readRow" type="number" min="1" value="1" /></label>
+            <label>列
+              <select id="readCol">
+                <option value="customer_email">customer_email</option>
+                <option value="session_label">session_label</option>
+                <option value="audit_ref">audit_ref</option>
+              </select>
+            </label>
+            <label class="check"><input id="readCache" type="checkbox" checked /> 用缓存</label>
+            <button id="doRead" class="btn" type="button">读取</button>
+          </div>
+          <div id="readResult" class="result" aria-live="polite"></div>
+        </div>
+
+        <div class="card">
+          <h2>写入与改写</h2>
+          <p class="hint">新写入永远用当前活动钥。改写一格会把旧钥密文读出来再用活动钥加密。</p>
+          <div class="form-row tight">
+            <button id="newWrite" class="btn" type="button">追加一条虚构记录</button>
+            <button id="burstWrite" class="btn ghost" type="button">追加 5 条</button>
+          </div>
+          <div class="form-row tight">
+            <label>行 id <input id="rewriteRow" type="number" min="1" value="1" /></label>
+            <label>列
+              <select id="rewriteCol">
+                <option value="customer_email">customer_email</option>
+                <option value="session_label">session_label</option>
+                <option value="audit_ref">audit_ref</option>
+              </select>
+            </label>
+            <button id="doRewrite" class="btn" type="button">改用活动钥</button>
+          </div>
+          <div id="writeResult" class="result" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>数据浏览</h2>
+          <div class="form-row tight inline">
+            <button id="prevPage" class="btn ghost" type="button">上一页</button>
+            <span id="pageLabel" class="mono dim">1</span>
+            <button id="nextPage" class="btn ghost" type="button">下一页</button>
+          </div>
+        </div>
+        <p class="hint">每格角标是信封中的钥 id。两代密文可以同时存在；读路径按钥 id 逐格选择密钥。</p>
+        <div class="table-wrap">
+          <table id="eventsTable">
+            <thead>
+              <tr>
+                <th>id</th><th>时间</th><th>区域</th><th>套餐</th><th>金额</th>
+                <th>customer_email <span class="th-sub">pii</span></th>
+                <th>session_label <span class="th-sub">analytics</span></th>
+                <th>audit_ref <span class="th-sub">audit</span></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h2>储留钥与在途读取</h2>
+          <p class="hint">手动租约模拟“旧查询还没读完”。只要有对应的活动租约，旧钥就不能销毁。</p>
+          <div class="form-row tight">
+            <label>用途
+              <select id="leasePurpose">
+                <option value="pii">pii</option>
+                <option value="analytics">analytics</option>
+                <option value="audit">audit</option>
+              </select>
+            </label>
+            <label>钥 id <input id="leaseKey" class="mono" placeholder="自动取退休钥" /></label>
+            <label>秒 <input id="leaseTtl" type="number" min="1" max="1800" value="120" /></label>
+            <button id="addLease" class="btn" type="button">占用</button>
+          </div>
+          <div id="leaseList" class="mini-list"></div>
+        </div>
+
+        <div class="card">
+          <h2>用途撤销与缓存</h2>
+          <p class="hint">撤销后立即清空该用途缓存，后续读取与新写入一律拒绝；进行中的租约不强行中断，但不再产出新值。</p>
+          <div class="form-row tight">
+            <label>用途
+              <select id="revPurpose">
+                <option value="pii">pii</option>
+                <option value="analytics">analytics</option>
+                <option value="audit">audit</option>
+              </select>
+            </label>
+            <button id="revoke" class="btn danger" type="button">撤销</button>
+            <button id="restore" class="btn ghost" type="button">恢复</button>
+            <button id="purgeCache" class="btn ghost" type="button">清缓存</button>
+          </div>
+          <div id="cacheInfo" class="mini-list"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>版本清单</h2>
+          <a class="btn ghost" href="/api/manifest" target="_blank" rel="noopener">打开 JSON</a>
+        </div>
+        <p class="hint">清单只含元数据与指纹，不含任何密钥字节。可用于比对部署与审计。</p>
+        <pre id="manifestView" class="manifest mono"></pre>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
